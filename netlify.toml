@@ -4,7 +4,13 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Ensure devDependencies (like @vitejs/plugin-react) are installed
   NPM_FLAGS = "--no-fund --no-audit"
+  NPM_CONFIG_PRODUCTION = "false"
+  # Avoid some CI tools skipping install scripts that might be needed
+  CI = ""
+  # (Optional) Force a clean install each build if caching keeps breaking
+  # NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
 # Redirect all routes to index.html for SPA
 [[redirects]]
