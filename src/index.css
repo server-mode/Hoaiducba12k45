@@ -90,3 +90,15 @@ body { font-family: 'Be Vietnam Pro', sans-serif; }
 #goldenBoardTableWrapper::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#f59e0b,#b45309); }
 #goldenBoardTableWrapper { scrollbar-width: thin; scrollbar-color: #d97706 rgba(217,119,6,0.15); }
 .dark #goldenBoardTableWrapper { scrollbar-color: #fbbf24 rgba(217,119,6,0.2); }
+
+/* Generic custom scrollbar for modal scroll areas */
+.custom-scrollbar { scrollbar-width: thin; scrollbar-color: #4ade80 rgba(16,185,129,0.18); }
+.dark .custom-scrollbar { scrollbar-color: #34d399 rgba(16,185,129,0.22); }
+.custom-scrollbar::-webkit-scrollbar { width: 10px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: linear-gradient(180deg,#f8fafc,#f1f5f9); border-left: 1px solid rgba(16,185,129,0.15); }
+.dark .custom-scrollbar::-webkit-scrollbar-track { background: linear-gradient(180deg,#111827,#1e293b); border-left: 1px solid rgba(16,185,129,0.25); }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#6ee7b7,#10b981); border: 2px solid #f8fafc; border-radius: 8px; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { border-color:#111827; background: linear-gradient(180deg,#34d399,#059669); }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#34d399,#059669); }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#10b981,#047857); }
+
