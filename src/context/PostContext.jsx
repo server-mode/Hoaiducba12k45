@@ -183,8 +183,33 @@ export function PostProvider({ children }) {
   }
   async function setReaction(entityType, entityId, reactionType){
     if(!user) throw new Error('Chưa đăng nhập');
+    // Defensive: if entityType looks like a UUID and reactionType looks like entityId swapped, attempt auto-correct
+    const uuidRegex = /^[0-9a-fA-F-]{32,}$/;
+    if(uuidRegex.test(entityType) && ['post','comment','reply'].includes(entityId)){
+      // likely swapped first two args
+      const tmp = entityType; // actually entityId
+      entityType = entityId;  // correct entityType
+      entityId = tmp;         // correct entityId
+    }
+    if(!['post','comment','reply'].includes(entityType)) throw new Error('Loại entity không hợp lệ');
+    if(!DEFAULT_REACTIONS[reactionType]) throw new Error('Loại reaction không hợp lệ');
     const before = getEntityReactions(entityType, entityId);
-    // optimistic: remove user from all then add to chosen
+    const alreadySame = (before[reactionType]||[]).includes(user.id);
+    if(alreadySame){
+      // Treat clicking again as remove (toggle off)
+      mutateEntityReactions(entityType, entityId, (rx)=>{
+        const updated = Object.fromEntries(Object.keys(DEFAULT_REACTIONS).map(k=> [k, (rx[k]||[]).filter(uid=> uid!==user.id)]));
+        return updated;
+      });
+      try {
+        await supabase.from('reactions').delete().eq('entity_type', entityType).eq('entity_id', entityId).eq('user_id', user.id);
+      } catch(err){
+        mutateEntityReactions(entityType, entityId, ()=>before); // rollback
+        throw err;
+      }
+      return;
+    }
+    // Not same -> replace whatever previous reaction (if any) with new one
     mutateEntityReactions(entityType, entityId, (rx)=>{
       const updated = Object.fromEntries(Object.keys(DEFAULT_REACTIONS).map(k=> [k, (rx[k]||[]).filter(uid=> uid!==user.id)]));
       updated[reactionType] = [...updated[reactionType], user.id];
@@ -195,13 +220,18 @@ export function PostProvider({ children }) {
       const { error } = await supabase.from('reactions').insert({ entity_type:entityType, entity_id:entityId, user_id:user.id, reaction_type:reactionType });
       if(error) throw error;
     } catch(err){
-      // rollback
-      mutateEntityReactions(entityType, entityId, ()=>before);
+      mutateEntityReactions(entityType, entityId, ()=>before); // rollback
       throw err;
     }
   }
   async function toggleReaction(entityType, entityId, reactionType){
     if(!user) throw new Error('Chưa đăng nhập');
+    const uuidRegex = /^[0-9a-fA-F-]{32,}$/;
+    if(uuidRegex.test(entityType) && ['post','comment','reply'].includes(entityId)){
+      const tmp = entityType; entityType = entityId; entityId = tmp;
+    }
+    if(!['post','comment','reply'].includes(entityType)) throw new Error('Loại entity không hợp lệ');
+    if(!DEFAULT_REACTIONS[reactionType]) throw new Error('Loại reaction không hợp lệ');
     const current = getEntityReactions(entityType, entityId);
     const has = (current[reactionType]||[]).includes(user.id);
     const before = current;
@@ -256,6 +286,7 @@ export function PostProvider({ children }) {
 
   // Reaction helper wrappers (single-user replacement logic) for UI pickers
   async function choosePostReaction(postId, type){ await setReaction('post', postId, type); }
+  async function togglePostReaction(postId, type){ await toggleReaction('post', postId, type); }
   async function chooseCommentReaction(postId, commentId, type){ await setReaction('comment', commentId, type); }
   async function toggleCommentReaction(postId, commentId, type){ await toggleReaction('comment', commentId, type); }
   async function chooseReplyReaction(postId, commentId, replyId, type){ await setReaction('reply', replyId, type); }
@@ -264,7 +295,7 @@ export function PostProvider({ children }) {
   // usersMap fallback -> use profiles (legacy component expects usersMap)
   const usersMap = profiles;
 
-  const value = { posts, loading, profiles, usersMap, createPost, updatePost, deletePost, restorePost, hardDeletePost, addComment, updateComment: updateCommentUI, deleteComment: deleteCommentUI, addReply: addReplyUI, updateReply: updateReplyUI, deleteReply: deleteReplyUI, setReaction, toggleReaction, refreshPost, isRefreshing, choosePostReaction, chooseCommentReaction, toggleCommentReaction, chooseReplyReaction, toggleReplyReaction };
+  const value = { posts, loading, profiles, usersMap, createPost, updatePost, deletePost, restorePost, hardDeletePost, addComment, updateComment: updateCommentUI, deleteComment: deleteCommentUI, addReply: addReplyUI, updateReply: updateReplyUI, deleteReply: deleteReplyUI, setReaction, toggleReaction, refreshPost, isRefreshing, choosePostReaction, togglePostReaction, chooseCommentReaction, toggleCommentReaction, chooseReplyReaction, toggleReplyReaction };
   return <PostContext.Provider value={value}>{children}</PostContext.Provider>;
 }
 
