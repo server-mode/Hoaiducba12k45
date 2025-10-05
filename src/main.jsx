@@ -17,7 +17,7 @@ import './index.css';
 createRoot(document.getElementById('root')).render(
 	<AuthProvider>
 		<PostProvider>
-			<BrowserRouter>
+			<BrowserRouter basename="/Hoaiducba12k45">
 				<Routes>
 					<Route path="/" element={<App />}> 
 						<Route index element={<HomePage />} />
