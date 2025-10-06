@@ -116,7 +116,7 @@ function PostActions({ post }){
 
 function ReactionBar({ post }){
   const { user } = useAuth();
-  const { choosePostReaction, toggleReaction } = usePosts();
+  const { choosePostReaction, togglePostReaction } = usePosts();
   const userId = user?.id;
   const [pickerOpen, setPickerOpen] = useState(false);
   const btnRef = useRef(null);
@@ -129,7 +129,7 @@ function ReactionBar({ post }){
   function onPrimaryClick(){
     if(!userId) return; // require auth
     if(userReaction){
-      toggleReaction(post.id, userReaction); // remove existing reaction
+      togglePostReaction(post.id, userReaction); // remove existing reaction (correct helper)
     } else {
       setPickerOpen(true);
     }
