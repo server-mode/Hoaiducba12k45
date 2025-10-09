@@ -31,10 +31,11 @@ export function ForumInfoSidebar(){
                 </a>
               </li>
             </ul>
-            <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">(Bạn sẽ thêm link sau)</div>
+            <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400"></div>
           </div>
         </div>
       </div>
     </aside>
   );
 }
+
