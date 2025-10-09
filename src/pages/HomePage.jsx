@@ -4,6 +4,8 @@ import { IntroModal } from '../components/IntroModal.jsx';
 import { usePosts } from '../context/PostContext.jsx';
 import { PostComposer } from '../components/PostComposer.jsx';
 import { PostList } from '../components/PostItem.jsx';
+import { UsersSidebar } from '../components/UsersSidebar.jsx';
+import { ForumInfoSidebar } from '../components/ForumInfoSidebar.jsx';
 
 export function HomePage(){
   const [open, setOpen] = useState(false);
@@ -28,10 +30,14 @@ export function HomePage(){
           </button>
         </div>
       </div>
-      <main className="relative container mx-auto px-6 pt-10 pb-16 max-w-4xl">
-        <div className="space-y-6 bg-transparent">
-          <PostComposer />
-          <PostList posts={ordered} />
+      <main className="relative container mx-auto px-6 pt-10 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <UsersSidebar />
+          <div className="lg:col-span-6 max-w-3xl mx-auto w-full space-y-6">
+            <PostComposer />
+            <PostList posts={ordered} />
+          </div>
+          <ForumInfoSidebar />
         </div>
       </main>
       <IntroModal open={open} onClose={()=>setOpen(false)} />
