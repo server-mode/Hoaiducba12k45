@@ -1,23 +1,55 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePosts } from '../context/PostContext.jsx';
 import { PostItem } from '../components/PostItem.jsx';
 import { PostComposer } from '../components/PostComposer.jsx';
 import { formatDistanceToNow } from '../utils/formatDistance.js';
+import { supabase } from '../lib/supabaseClient.js';
 
 export function ProfilePage(){
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user, updateProfile, updateCover, changePassword, loading } = useAuth();
   const { posts, usersMap } = usePosts();
-  const profileUser = id ? usersMap[id] : user;
-  useEffect(()=>{ if(!loading && id && !profileUser){ navigate('/profile'); } }, [id, profileUser, loading, navigate]);
-  const isOwner = profileUser && user && profileUser.id === user.id;
+  const cached = id ? usersMap[id] : null;
+  const [fetched, setFetched] = useState(null);
+  const [fetching, setFetching] = useState(false);
+  // Lazy fetch profile by id if not in cache
+  useEffect(()=>{
+    let alive = true;
+    (async ()=>{
+      if(!id || cached || fetched || fetching || loading) return;
+      setFetching(true);
+      try {
+        // Try to include common fields; fallback if some columns missing
+        let { data, error } = await supabase.from('profiles').select('id, name, bio, avatar_url, cover_url, created_at, email').eq('id', id).single();
+        if(error && error.code === 'PGRST204') data = null; // no content
+        if(!data){
+          // Try minimal selection
+          const res = await supabase.from('profiles').select('id, name, avatar_url').eq('id', id).single();
+          if(!res.error) data = res.data;
+        }
+        if(alive && data){
+          setFetched({
+            id: data.id,
+            name: data.name || 'Ẩn danh',
+            bio: data.bio || '',
+            avatar: data.avatar_url || null,
+            cover: data.cover_url || null,
+            email: data.email || null,
+            createdAt: data.created_at || null
+          });
+        }
+      } finally { if(alive) setFetching(false); }
+    })();
+    return ()=>{ alive = false; };
+  }, [id, cached, fetched, fetching, loading]);
+  const effectiveProfile = id ? (cached || fetched) : user;
+  const isOwner = effectiveProfile && user && effectiveProfile.id === user.id;
   const [activeTab, setActiveTab] = useState('posts');
   const [editingBio, setEditingBio] = useState(false);
-  const [bioDraft, setBioDraft] = useState(profileUser?.bio || '');
-  const [nameDraft, setNameDraft] = useState(profileUser?.name || '');
+  const [bioDraft, setBioDraft] = useState(effectiveProfile?.bio || '');
+  const [nameDraft, setNameDraft] = useState(effectiveProfile?.name || '');
   const [savingName, setSavingName] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [oldPw, setOldPw] = useState('');
@@ -30,26 +62,32 @@ export function ProfilePage(){
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
 
-  useEffect(()=>{ setBioDraft(profileUser?.bio||''); setNameDraft(profileUser?.name||''); }, [profileUser?.bio, profileUser?.name]);
+  useEffect(()=>{ setBioDraft(effectiveProfile?.bio||''); setNameDraft(effectiveProfile?.name||''); }, [effectiveProfile?.bio, effectiveProfile?.name]);
 
   function pickFile(ref){ ref.current?.click(); }
   function readFile(file, cb){ if(!file) return; if(file.size>2*1024*1024) return; const r=new FileReader(); r.onload=e=>cb(e.target.result); r.readAsDataURL(file); }
   function onAvatarChange(e){ const f=e.target.files?.[0]; if(!f) return; setAvatarUploading(true); readFile(f, async data=>{ await updateProfile({ avatar: data }); setAvatarUploading(false); }); }
   function onCoverChange(e){ const f=e.target.files?.[0]; if(!f) return; setCoverUploading(true); readFile(f, async data=>{ await updateCover(data); setCoverUploading(false); }); }
   async function saveBio(){ await updateProfile({ bio: bioDraft }); setEditingBio(false); }
-  async function saveName(){ setSavingName(true); await updateProfile({ name: nameDraft||profileUser.email }); setSavingName(false); }
+  async function saveName(){ setSavingName(true); await updateProfile({ name: nameDraft||effectiveProfile.email }); setSavingName(false); }
   async function changePw(e){ e.preventDefault(); setPwErr(null); setPwMsg(null); if(newPw.length<4){ setPwErr('Mật khẩu quá ngắn'); return; } if(newPw!==newPw2){ setPwErr('Nhập lại không khớp'); return; } try{ await changePassword({ oldPassword: oldPw, newPassword: newPw }); setPwMsg('Đổi mật khẩu thành công'); setOldPw(''); setNewPw(''); setNewPw2(''); } catch(err){ setPwErr(err.message); } }
 
-  const userPosts = posts.filter(p=> p.authorId === profileUser?.id);
+  const userPosts = posts.filter(p=> p.authorId === effectiveProfile?.id);
   const allImages = userPosts.flatMap(p=> p.images.map((img,i)=> ({ src: img, postId: p.id, idx: i })));
 
-  if(!profileUser) return <div className="max-w-5xl mx-auto px-4 py-16 text-center text-sm text-gray-500">Không tìm thấy người dùng</div>;
+  if(id && !effectiveProfile){
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-16 text-center text-sm text-gray-500">
+        {fetching ? 'Đang tải hồ sơ...' : 'Không tìm thấy người dùng'}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
       {/* Cover Section */}
       <div className="relative w-full bg-gray-300 dark:bg-gray-700 aspect-[3/1] md:aspect-[3.5/1] overflow-hidden">
-        {profileUser.cover ? <img src={profileUser.cover} alt="cover" className="w-full h-full object-cover" /> : (
+  {effectiveProfile?.cover ? <img src={effectiveProfile.cover} alt="cover" className="w-full h-full object-cover" /> : (
           <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">Chưa có ảnh bìa</div>
         )}
         {isOwner && (
@@ -63,7 +101,7 @@ export function ProfilePage(){
       <div className="max-w-5xl mx-auto px-4 md:px-6 -mt-20 relative z-10">
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 bg-white dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-xl backdrop-blur-sm">
           <div className="relative group w-40 h-40 rounded-full ring-4 ring-white dark:ring-black shadow-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600 text-white text-4xl font-bold flex items-center justify-center">
-            {profileUser.avatar ? <img src={profileUser.avatar} alt="avatar" className="w-full h-full object-cover" /> : (profileUser.name||profileUser.email||'?').charAt(0).toUpperCase()}
+            {effectiveProfile?.avatar ? <img src={effectiveProfile.avatar} alt="avatar" className="w-full h-full object-cover" /> : (effectiveProfile?.name||effectiveProfile?.email||'?').charAt(0).toUpperCase()}
             {isOwner && (
               <button onClick={()=>pickFile(avatarInputRef)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold transition">Đổi ảnh</button>
             )}
@@ -75,7 +113,7 @@ export function ProfilePage(){
                 <input disabled={!isOwner} value={nameDraft} onChange={e=>setNameDraft(e.target.value)} className={`text-2xl md:text-3xl font-bold bg-transparent border-b focus:outline-none focus:border-green-500 ${isOwner? 'border-gray-300 dark:border-gray-600':'border-transparent'} pb-1`} />
                 {isOwner && <button onClick={saveName} disabled={savingName} className="text-xs px-3 py-1.5 rounded-md bg-green-600 text-white disabled:opacity-50">{savingName?'Lưu...':'Lưu'}</button>}
               </div>
-              <div className="text-xs text-gray-500">Tham gia {formatDistanceToNow(profileUser.createdAt)}</div>
+              <div className="text-xs text-gray-500">Tham gia {formatDistanceToNow(effectiveProfile?.createdAt)}</div>
             </div>
             <div className="text-sm text-gray-700 dark:text-gray-300">
               {editingBio ? (
@@ -88,7 +126,7 @@ export function ProfilePage(){
                 </div>
               ) : (
                 <div>
-                  {profileUser.bio ? <p className="leading-relaxed whitespace-pre-wrap break-words">{profileUser.bio}</p> : <p className="text-gray-400 text-sm italic">Chưa có giới thiệu.</p>}
+                  {effectiveProfile?.bio ? <p className="leading-relaxed whitespace-pre-wrap break-words">{effectiveProfile.bio}</p> : <p className="text-gray-400 text-sm italic">Chưa có giới thiệu.</p>}
                   {isOwner && <button onClick={()=>setEditingBio(true)} className="mt-2 text-xs font-medium text-green-600 hover:underline">Chỉnh sửa giới thiệu</button>}
                 </div>
               )}
@@ -118,13 +156,13 @@ export function ProfilePage(){
             <div className="grid md:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-2">
                 <h3 className="text-sm font-semibold mb-3">Thông tin cơ bản</h3>
-                <div className="text-xs text-gray-600 dark:text-gray-300">Email: <span className="font-medium">{profileUser.email}</span></div>
-                <div className="text-xs text-gray-600 dark:text-gray-300">Tham gia: <span className="font-medium">{new Date(profileUser.createdAt).toLocaleDateString()}</span></div>
+                <div className="text-xs text-gray-600 dark:text-gray-300">Email: <span className="font-medium">{effectiveProfile?.email||'—'}</span></div>
+                <div className="text-xs text-gray-600 dark:text-gray-300">Tham gia: <span className="font-medium">{effectiveProfile?.createdAt? new Date(effectiveProfile.createdAt).toLocaleDateString() : '—'}</span></div>
                 <div className="text-xs text-gray-600 dark:text-gray-300">Bài viết: <span className="font-medium">{userPosts.length}</span></div>
               </div>
               <div className="bg-white dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-3">
                 <h3 className="text-sm font-semibold">Giới thiệu</h3>
-                {!editingBio && profileUser.bio && <p className="text-sm whitespace-pre-wrap break-words">{profileUser.bio}</p>}
+                {!editingBio && effectiveProfile?.bio && <p className="text-sm whitespace-pre-wrap break-words">{effectiveProfile.bio}</p>}
                 {isOwner && !editingBio && <button onClick={()=>setEditingBio(true)} className="text-xs text-green-600 hover:underline">Chỉnh sửa</button>}
                 {editingBio && (
                   <div className="space-y-2">
