@@ -5,6 +5,14 @@ export function MemberGrid({ members = [], onSelect }) {
   useEffect(() => {
     // Lazy loading & intersection
     const imgs = document.querySelectorAll('img.lazy-image');
+    if(!('IntersectionObserver' in window)){
+      // Fallback: set src immediately
+      imgs.forEach(img => {
+        const src = img.getAttribute('data-src');
+        if(src){ img.src = src; }
+      });
+      return;
+    }
     const imageObserver = new IntersectionObserver((entries, observer) => {
       entries.forEach(entry => {
         if(entry.isIntersecting){
@@ -15,11 +23,11 @@ export function MemberGrid({ members = [], onSelect }) {
           observer.unobserve(img);
         }
       });
-    }, { rootMargin:'100px 0px', threshold:0.1 });
+    }, { rootMargin:'200px 0px', threshold:0.01 });
     imgs.forEach(i => imageObserver.observe(i));
 
     const cards = document.querySelectorAll('.member-card');
-    const cardObserver = new IntersectionObserver(entries => {
+  const cardObserver = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         const card = entry.target;
         if(entry.isIntersecting){
@@ -29,7 +37,7 @@ export function MemberGrid({ members = [], onSelect }) {
           card.classList.remove('visible');
         }
       });
-    }, { rootMargin: '0px 0px -50px 0px', threshold:0.2 });
+  }, { rootMargin: '50px 0px -10% 0px', threshold:0.1 });
     cards.forEach(c => cardObserver.observe(c));
 
     return () => { imageObserver.disconnect(); cardObserver.disconnect(); };
